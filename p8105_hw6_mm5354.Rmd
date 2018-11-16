@@ -1,0 +1,59 @@
+---
+title: "p8105_hw3_mm5354"
+author: "Mengran Ma"
+date: "2018/11/15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+```{r Problem1_import_data}
+tidy_data = 
+  read_csv("/Users/nadongma/Desktop/p8105_hw5_mm5354/homicide_data.csv") %>% 
+  janitor::clean_names() %>%
+  unite(city_state, city, state, sep = ", ", remove = FALSE) %>%
+  mutate(solved_or_not = 1) %>%
+  mutate(solved_or_not = 0 * (disposition != "Closed by arrest") + 1 * (disposition == "Closed by arrest")) %>%
+  filter(city_state != "Dallas, TX" & city_state != "Phoenix, AZ" & city_state != "Kansas City, MO" & city_state != "Tulsa, AL") %>% 
+  #mutate(victim_race = 0 * (victim_race != "White") + 1 * (victim_race == "White")) %>% 
+  mutate(victim_race = fct_relevel(victim_race, "White")) %>% 
+  mutate(victim_age = as.numeric(victim_age))
+
+logistic_regression = tidy_data %>% 
+  filter(city_state == "Baltimore, MD") %>% 
+  glm(solved_or_not ~ victim_age + victim_race + victim_sex, data = ., family = binomial()) %>%
+  broom::tidy() %>%
+  mutate(OR = exp(estimate)) %>%
+  select(term, log_OR = estimate, OR, p.value) %>% 
+  knitr::kable(digits = 3)
+
+
+city_nest = tidy_data %>% 
+  group_by(city_state) %>% 
+  nest() %>%
+  mutate(models = map(data, ~glm(solved_or_not ~ victim_age + victim_race + victim_sex, data = ., family = binomial())),
+         models = map(models, broom::tidy)) %>% 
+  unnest() %>% 
+  mutate(OR = exp(estimate)) %>%
+  select(term, log_OR = estimate, OR, p.value) %>% 
+  knitr::kable(digits = 3)
+    
+```
+
+
+```{r Problem2_import_data}
+tidy_data_P2 = 
+  read_csv("/Users/nadongma/Desktop/p8105_hw6_mm5354/birthweight.csv") %>% 
+  janitor::clean_names() %>%
+  mutate(babysex = as.factor(babysex),
+         frace = as.factor(frace),
+         malform = as.factor(malform),
+         mrace = as.factor(mrace))
+fit = lm(bwt ~ bhead + blength + wtgain, data = tidy_data_P2)
+tidy_data_P2 = modelr::add_residuals(tidy_data_P2, fit)
+tidy_data_P2 = modelr::add_predictions(tidy_data_P2, fit)
+tidy_data_P2
+```
