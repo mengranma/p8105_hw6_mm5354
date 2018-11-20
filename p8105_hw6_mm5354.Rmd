@@ -8,8 +8,12 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(purrr)
+library(modelr)
 ```
+#Problem 1
 
+##Create a city_state variable (e.g. “Baltimore, MD”), and a binary variable indicating whether the homicide is solved. Omit cities Dallas, TX; Phoenix, AZ; and Kansas City, MO – these don’t report victim race. Also omit Tulsa, AL – this is a data entry mistake. Modifiy victim_race to have categories white and non-white, with white as the reference category. Be sure that victim_age is numeric.
 ```{r Problem1_import_data}
 tidy_data = 
   read_csv("/Users/nadongma/Desktop/p8105_hw5_mm5354/homicide_data.csv") %>% 
@@ -18,30 +22,61 @@ tidy_data =
   mutate(solved_or_not = 1) %>%
   mutate(solved_or_not = 0 * (disposition != "Closed by arrest") + 1 * (disposition == "Closed by arrest")) %>%
   filter(city_state != "Dallas, TX" & city_state != "Phoenix, AZ" & city_state != "Kansas City, MO" & city_state != "Tulsa, AL") %>% 
-  #mutate(victim_race = 0 * (victim_race != "White") + 1 * (victim_race == "White")) %>% 
-  mutate(victim_race = fct_relevel(victim_race, "White")) %>% 
+  mutate(victim_race = 1 * (victim_race != "White") + 0 * (victim_race == "White")) %>% 
+  #mutate(victim_race = fct_relevel(victim_race, "White")) %>% 
   mutate(victim_age = as.numeric(victim_age))
+```
 
+##For the city of Baltimore, MD, use the glm function to fit a logistic regression with resolved vs unresolved as the outcome and victim age, sex and race (as just defined) as predictors. Save the output of glm as an R object; apply the broom::tidy to this object; and obtain the estimate and confidence interval of the adjusted odds ratio for solving homicides comparing non-white victims to white victims keeping all other variables fixed.
+```{r logistic_regression}
 logistic_regression = tidy_data %>% 
   filter(city_state == "Baltimore, MD") %>% 
-  glm(solved_or_not ~ victim_age + victim_race + victim_sex, data = ., family = binomial()) %>%
+  glm(solved_or_not ~ victim_age + victim_sex + victim_race, data = ., family = binomial()) %>%
   broom::tidy() %>%
-  mutate(OR = exp(estimate)) %>%
-  select(term, log_OR = estimate, OR, p.value) %>% 
+  mutate(OR = exp(estimate),
+         lower_bound = exp(estimate - std.error*1.96),
+         upper_bound = exp(estimate + std.error*1.96)) %>%
+  select(term, log_OR = estimate, lower_bound, upper_bound, OR, p.value) %>% 
   knitr::kable(digits = 3)
+```
 
 
+##Now run glm for each of the cities in your dataset, and extract the adjusted odds ratio (and CI) for solving homicides comparing non-white victims to white victims. Do this within a “tidy” pipeline, making use of purrr::map, list columns, and unnest as necessary to create a dataframe with estimated ORs and CIs for each city.
+```{r regression}
 city_nest = tidy_data %>% 
   group_by(city_state) %>% 
   nest() %>%
   mutate(models = map(data, ~glm(solved_or_not ~ victim_age + victim_race + victim_sex, data = ., family = binomial())),
          models = map(models, broom::tidy)) %>% 
-  unnest() %>% 
-  mutate(OR = exp(estimate)) %>%
-  select(term, log_OR = estimate, OR, p.value) %>% 
+  select(-data) %>% 
+  unnest() %>%
+  mutate(OR = exp(estimate),
+         lower_bound = exp(estimate - std.error*1.96),
+         upper_bound = exp(estimate + std.error*1.96)) %>%
+  select(city_state, term, log_OR = estimate, OR, lower_bound, upper_bound, p.value)
+city_nest %>% 
   knitr::kable(digits = 3)
-    
 ```
+
+```{r plot}
+city_nest %>% 
+  filter(term == "victim_race") %>% 
+  mutate(city_state = fct_reorder(city_state, OR)) %>% 
+  ggplot(aes(x = city_state, y = OR, color = city_state)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower_bound , ymax = upper_bound), width = 0.25) +
+  labs(
+      title = "Proportion estimates and CIs for each city",
+      x = "City",
+      y = "Estimate"
+      ) +
+  theme(axis.text.x = element_text(angle = 90, size = 6)) +
+  theme(legend.position = "none")
+```
+
+
+
+    
 
 
 ```{r Problem2_import_data}
@@ -51,9 +86,31 @@ tidy_data_P2 =
   mutate(babysex = as.factor(babysex),
          frace = as.factor(frace),
          malform = as.factor(malform),
-         mrace = as.factor(mrace))
+         mrace = as.factor(mrace)) %>% 
+  mutate(babysex_recode = 1) %>%
+  mutate(babysex_recode = 0 * (babysex != 1) + 1 * (babysex == 1)) 
 fit = lm(bwt ~ bhead + blength + wtgain, data = tidy_data_P2)
 tidy_data_P2 = modelr::add_residuals(tidy_data_P2, fit)
 tidy_data_P2 = modelr::add_predictions(tidy_data_P2, fit)
 tidy_data_P2
+
+tidy_data_P2 %>% 
+  ggplot(aes(x = pred, y = resid))+geom_point()
+
+fit2 = lm(bwt ~ blength + gaweeks, data = tidy_data_P2)
+fit2
+fit3 = lm(bwt ~ bhead + blength + babysex + bhead*babysex + bhead*blength + blength*babysex, data = tidy_data_P2)
+fit3
+
+cv_P2 = tidy_data_P2 %>%
+  crossv_mc(n = 50)
+
+print(cv_P2)
+
+cv_models = cv_P2 %>%
+  mutate(model = map(train, ~lm(bwt ~ bhead + blength + wtgain, data = .)),
+         model2 = map(train, ~lm(bwt ~ blength + gaweeks, data = .)),
+         model3 = map(train, ~lm(bwt ~ bhead + blength + babysex + bhead*babysex + bhead*blength + blength*babysex, data = .)))
+
+print(cv_models)
 ```
