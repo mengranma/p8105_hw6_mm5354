@@ -21,7 +21,8 @@ tidy_data =
   unite(city_state, city, state, sep = ", ", remove = FALSE) %>%
   mutate(solved_or_not = 1) %>%
   mutate(solved_or_not = 0 * (disposition != "Closed by arrest") + 1 * (disposition == "Closed by arrest")) %>%
-  filter(city_state != "Dallas, TX" & city_state != "Phoenix, AZ" & city_state != "Kansas City, MO" & city_state != "Tulsa, AL") %>% 
+  filter(city_state != "Dallas, TX" & city_state != "Phoenix, AZ" & city_state != "Kansas City, MO" & city_state != "Tulsa, AL") %>%
+  filter(victim_race != "Unknown") %>% 
   mutate(victim_race = 1 * (victim_race != "White") + 0 * (victim_race == "White")) %>% 
   #mutate(victim_race = fct_relevel(victim_race, "White")) %>% 
   mutate(victim_age = as.numeric(victim_age))
@@ -75,10 +76,6 @@ city_nest %>%
 ```
 
 
-
-    
-
-
 ```{r Problem2_import_data}
 tidy_data_P2 = 
   read_csv("/Users/nadongma/Desktop/p8105_hw6_mm5354/birthweight.csv") %>% 
@@ -113,4 +110,10 @@ cv_models = cv_P2 %>%
          model3 = map(train, ~lm(bwt ~ bhead + blength + babysex + bhead*babysex + bhead*blength + blength*babysex, data = .)))
 
 print(cv_models)
+
+rmse_cv = cv_models %>%
+  mutate(rmse_models_1 = map2_dbl(model, test, ~rmse(.x, .y)),
+         rmse_models_2 = map2_dbl(model2, test, ~rmse(.x, .y)),
+         rmse_models_3 = map2_dbl(model3, test, ~rmse(.x, .y)))
+
 ```
