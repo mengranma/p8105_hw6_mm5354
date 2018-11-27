@@ -18,7 +18,7 @@ library("leaps")
 ###Create a city_state variable (e.g. “Baltimore, MD”), and a binary variable indicating whether the homicide is solved. Omit cities Dallas, TX; Phoenix, AZ; and Kansas City, MO – these don’t report victim race. Also omit Tulsa, AL – this is a data entry mistake. Modifiy victim_race to have categories white and non-white, with white as the reference category. Be sure that victim_age is numeric.
 ```{r Problem1_import_data}
 tidy_data = 
-  read_csv("/Users/nadongma/Desktop/p8105_hw5_mm5354/homicide_data.csv") %>% 
+  read_csv("/Users/nadongma/Desktop/p8105_hw6_mm5354/homicide_data.csv") %>% 
   janitor::clean_names() %>%
   unite(city_state, city, state, sep = ", ", remove = FALSE) %>%
   mutate(solved_or_not = 1) %>%
@@ -26,7 +26,6 @@ tidy_data =
   filter(city_state != "Dallas, TX" & city_state != "Phoenix, AZ" & city_state != "Kansas City, MO" & city_state != "Tulsa, AL") %>%
   filter(victim_race != "Unknown") %>% 
   mutate(victim_race = 1 * (victim_race != "White") + 0 * (victim_race == "White")) %>% 
-  #mutate(victim_race = fct_relevel(victim_race, "White")) %>% 
   mutate(victim_age = as.numeric(victim_age))
 ```
 
@@ -58,7 +57,8 @@ city_nest = tidy_data %>%
          lower_bound = exp(estimate - std.error*1.96),
          upper_bound = exp(estimate + std.error*1.96)) %>%
   select(city_state, term, log_OR = estimate, OR, lower_bound, upper_bound, p.value)
-city_nest %>% 
+city_nest %>%
+  filter(term == "victim_race") %>% 
   knitr::kable(digits = 3)
 ```
 
@@ -182,4 +182,4 @@ rmse_cv %>%
 
 ```
 
-My Comment: based on the RMSE criterion, the model that I chose (model #1) and model #3 (One using head circumference, length, sex, and all interactions (including the three-way interaction)) have pretty low least mean rmses and low least error variances comparing to model #2 (One using length at birth and gestational age as predictors (main effects only)). Moreover, based on the RMSE criterion, the model I chose have the least mean rmse across all three models.
+My Comment: based on the RMSE criterion, the model that I chose (model #1) and model #3 (One using head circumference, length, sex, and all interactions (including the three-way interaction)) all have pretty low mean rmses and low error variances comparing to model #2 (One using length at birth and gestational age as predictors (main effects only)). Moreover, based on the RMSE criterion, the model I chose have the least mean rmse and least error variance across all three models.
