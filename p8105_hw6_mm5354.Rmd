@@ -10,6 +10,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(purrr)
 library(modelr)
+library(broom)
+library("leaps")
 ```
 #Problem 1
 
@@ -60,7 +62,7 @@ city_nest %>%
   knitr::kable(digits = 3)
 ```
 
-```{r plot}
+```{r plot, fig.height=6, dpi=300}
 city_nest %>% 
   filter(term == "victim_race") %>% 
   mutate(city_state = fct_reorder(city_state, OR)) %>% 
@@ -76,7 +78,10 @@ city_nest %>%
   theme(legend.position = "none")
 ```
 
+#Problem 2
 
+
+Read and tidy data.
 ```{r Problem2_import_data}
 tidy_data_P2 = 
   read_csv("/Users/nadongma/Desktop/p8105_hw6_mm5354/birthweight.csv") %>% 
@@ -86,8 +91,51 @@ tidy_data_P2 =
          malform = as.factor(malform),
          mrace = as.factor(mrace)) %>% 
   mutate(babysex_recode = 1) %>%
-  mutate(babysex_recode = 0 * (babysex != 1) + 1 * (babysex == 1)) 
-fit = lm(bwt ~ bhead + blength + wtgain, data = tidy_data_P2)
+  mutate(babysex_recode = 0 * (babysex != 1) + 1 * (babysex == 1))
+```
+
+
+
+###Propose a regression model for birthweight. This model may be based on a hypothesized structure for the factors that underly birthweight, on a data-driven model-building process, or a combination of the two. Describe your modeling process and show a plot of model residuals against fitted values.
+```{r Problem2_my_regression, fig.height=6, dpi=300}
+#fit = lm(bwt ~ bhead + blength + wtgain, data = tidy_data_P2)
+
+tidy_data_P2 <- tidy_data_P2 %>% 
+  select(bwt, babysex, bhead, blength, gaweeks, malform, 
+         delwt, menarche, mheight, momage, mrace, parity, pnumlbw, pnumsga, ppbmi, ppwt, smoken, wtgain,
+         everything())
+
+fit <- lm(bwt ~ ., data = tidy_data_P2)
+step(fit, direction = 'backward')
+
+
+best <- function(model, ...) 
+{
+  subsets <- regsubsets(formula(model), model.frame(model), ...)
+  subsets <- with(summary(subsets),
+                  cbind(p = as.numeric(rownames(which)), which, rss, rsq, adjr2, cp, bic))
+  
+  return(subsets)
+}   
+
+# Select the 'best' model of all subsets for 3-predictor model
+round(best(fit, nbest = 1), 3)
+
+
+# Summary of models for each size (one model per size)
+b<-regsubsets(bwt ~ ., data = tidy_data_P2)
+   (rs<-summary(b))
+
+# Plots of Cp and Adj-R2 as functions of parameters
+par(mar=c(4,4,1,1))
+par(mfrow=c(1,2))
+
+plot(2:10, rs$cp, xlab="No of parameters", ylab="Cp Statistic")
+abline(0,1)
+
+plot(2:10, rs$adjr2, xlab="No of parameters", ylab="Adj R2")
+
+
 tidy_data_P2 = modelr::add_residuals(tidy_data_P2, fit)
 tidy_data_P2 = modelr::add_predictions(tidy_data_P2, fit)
 tidy_data_P2
@@ -99,22 +147,39 @@ fit2 = lm(bwt ~ blength + gaweeks, data = tidy_data_P2)
 fit2
 fit3 = lm(bwt ~ bhead + blength + babysex + bhead*babysex + bhead*blength + blength*babysex, data = tidy_data_P2)
 fit3
+```
 
+My words: Here I use Model Building/Variable Selection methodology to explore various models. According to the **Plots of Cp and Adj-R2 as functions of parameters**, the **adjusted R^2** (coefficient of determination: describes how good the model fits) does not change that much after having **5** predictors' model. Also **Cp value** does not change that much after obtaining **5** predictors' model, for which this model is containing: 'baby’s birth weight (grams)' (Y) vs. 'bhead', 'blength', 'gaweeks', 'delwt',' mrace' (Xs). Therefore, I would use this model to address investigator’s objective, since the investigator is mainly interested in understanding the effects of several variables on a child’s birthweight.
+
+###Compare my model to two others
+### *One using length at birth and gestational age as predictors (main effects only)
+### *One using head circumference, length, sex, and all interactions (including the three-way interaction) between these
+###Make this comparison in terms of the cross-validated prediction error.
+```{r Problem2_cross_validation, fig.height=6, dpi=300}
 cv_P2 = tidy_data_P2 %>%
-  crossv_mc(n = 50)
+  crossv_mc(n = 100)
 
 print(cv_P2)
 
 cv_models = cv_P2 %>%
-  mutate(model = map(train, ~lm(bwt ~ bhead + blength + wtgain, data = .)),
+  mutate(my_model1 = map(train, ~lm(bwt ~ bhead + blength + gaweeks + delwt + mrace, data = .)),
          model2 = map(train, ~lm(bwt ~ blength + gaweeks, data = .)),
-         model3 = map(train, ~lm(bwt ~ bhead + blength + babysex + bhead*babysex + bhead*blength + blength*babysex, data = .)))
+         model3 = map(train, ~lm(bwt ~ bhead + blength + babysex + bhead*babysex + bhead*blength + blength*babysex + bhead*babysex*blength, data = .)))
 
 print(cv_models)
 
 rmse_cv = cv_models %>%
-  mutate(rmse_models_1 = map2_dbl(model, test, ~rmse(.x, .y)),
+  mutate(rmse_models_1 = map2_dbl(my_model1, test, ~rmse(.x, .y)),
          rmse_models_2 = map2_dbl(model2, test, ~rmse(.x, .y)),
          rmse_models_3 = map2_dbl(model3, test, ~rmse(.x, .y)))
 
+rmse_cv %>% 
+  select(starts_with("rmse")) %>% 
+  gather(key = model, value = rmse) %>% 
+  mutate(model = str_replace(model, "rmse_", ""),
+         model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) + geom_violin()
+
 ```
+
+My Comment: based on the RMSE criterion, the model that I chose (model #1) and model #3 (One using head circumference, length, sex, and all interactions (including the three-way interaction)) have pretty low least mean rmses and low least error variances comparing to model #2 (One using length at birth and gestational age as predictors (main effects only)). Moreover, based on the RMSE criterion, the model I chose have the least mean rmse across all three models.
