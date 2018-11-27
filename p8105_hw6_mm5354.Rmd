@@ -26,7 +26,8 @@ tidy_data =
   filter(city_state != "Dallas, TX" & city_state != "Phoenix, AZ" & city_state != "Kansas City, MO" & city_state != "Tulsa, AL") %>%
   filter(victim_race != "Unknown") %>% 
   mutate(victim_race = 1 * (victim_race != "White") + 0 * (victim_race == "White")) %>% 
-  mutate(victim_age = as.numeric(victim_age))
+  mutate(victim_age = as.numeric(victim_age)) %>% 
+  na.omit(victim_age)
 ```
 
 ###For the city of Baltimore, MD, use the glm function to fit a logistic regression with resolved vs unresolved as the outcome and victim age, sex and race (as just defined) as predictors. Save the output of glm as an R object; apply the broom::tidy to this object; and obtain the estimate and confidence interval of the adjusted odds ratio for solving homicides comparing non-white victims to white victims keeping all other variables fixed.
@@ -57,6 +58,8 @@ city_nest = tidy_data %>%
          lower_bound = exp(estimate - std.error*1.96),
          upper_bound = exp(estimate + std.error*1.96)) %>%
   select(city_state, term, log_OR = estimate, OR, lower_bound, upper_bound, p.value)
+
+
 city_nest %>%
   filter(term == "victim_race") %>% 
   knitr::kable(digits = 3)
@@ -156,6 +159,8 @@ My data-driven model-building process: Here I use Model Building/Variable Select
 ### *One using head circumference, length, sex, and all interactions (including the three-way interaction) between these
 ###Make this comparison in terms of the cross-validated prediction error.
 ```{r Problem2_cross_validation, fig.height=6, dpi=300}
+
+set.seed(1)
 cv_P2 = tidy_data_P2 %>%
   crossv_mc(n = 100)
 
