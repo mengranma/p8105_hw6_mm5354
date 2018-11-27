@@ -149,7 +149,7 @@ fit3 = lm(bwt ~ bhead + blength + babysex + bhead*babysex + bhead*blength + blen
 fit3
 ```
 
-My words: Here I use Model Building/Variable Selection methodology to explore various models. According to the **Plots of Cp and Adj-R2 as functions of parameters**, the **adjusted R^2** (coefficient of determination: describes how good the model fits) does not change that much after having **5** predictors' model. Also **Cp value** does not change that much after obtaining **5** predictors' model, for which this model is containing: 'baby’s birth weight (grams)' (Y) vs. 'bhead', 'blength', 'gaweeks', 'delwt',' mrace' (Xs). Therefore, I would use this model to address investigator’s objective, since the investigator is mainly interested in understanding the effects of several variables on a child’s birthweight.
+My data-driven model-building process: Here I use Model Building/Variable Selection methodology to explore various models. According to the **Plots of Cp and Adj-R2 as functions of parameters**, the **adjusted R^2** (coefficient of determination: describes how good the model fits) does not change that much after having **5** predictors' model. Also **Cp value** does not change that much after obtaining **5** predictors' model, for which this model is containing: 'baby’s birth weight (grams)' (Y) vs. 'bhead', 'blength', 'gaweeks', 'delwt',' mrace' (Xs). Therefore, I would use this model to address investigator’s objective, since the investigator is mainly interested in understanding the effects of several variables on a child’s birthweight.
 
 ###Compare my model to two others
 ### *One using length at birth and gestational age as predictors (main effects only)
